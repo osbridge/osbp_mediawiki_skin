@@ -79,6 +79,22 @@ class OSBridgeTemplate extends QuickTemplate {
     // Suppress warnings to prevent notices about missing indexes in $this->data
     wfSuppressWarnings();
 
+    // Parse title into:
+    // * $title_year: The year component of the title, e.g. "2011" for "2011/MyPage", else NULL. 
+    // * $title_shortened: The non-year component of the title, else the original title.
+    $title_original = $this->data['title'];
+    preg_match('/(^\d{4})(\/)(.+$)/', $title_original, $matches);
+    if (sizeof($matches) > 0) {
+      $title_year = $matches[1];
+      $title_shortened = $matches[3];
+    } else {
+      $title_year = NULL;
+      $title_shortened = $title_original;
+    }
+
+    // Remove the year prefix from the HTML title
+    $html_title_shortened = preg_replace('/^\d{4}\//', '', $this->data['pagetitle']);
+
 ?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="<?php $this->text('xhtmldefaultnamespace') ?>" <?php
   foreach($this->data['xhtmlnamespaces'] as $tag => $ns) {
@@ -87,7 +103,7 @@ class OSBridgeTemplate extends QuickTemplate {
   <head>
     <meta http-equiv="Content-Type" content="<?php $this->text('mimetype') ?>; charset=<?php $this->text('charset') ?>" />
     <?php $this->html('headlinks') ?>
-    <title><?php $this->text('pagetitle') ?></title>
+    <title><?php echo htmlspecialchars($html_title_shortened); ?></title>
     <?php $this->html('csslinks') ?>
 
     <!--[if lt IE 7]><script type="<?php $this->text('jsmimetype') ?>" src="<?php $this->text('stylepath') ?>/common/IEFixes.js?<?php echo $GLOBALS['wgStyleVersion'] ?>"></script>
@@ -95,9 +111,10 @@ class OSBridgeTemplate extends QuickTemplate {
 
     <?php print Skin::makeGlobalVariablesScript( $this->data ); ?>
 
-    <script type="<?php $this->text('jsmimetype') ?>" src="<?php $this->text('stylepath' ) ?>/common/wikibits.js?<?php echo $GLOBALS['wgStyleVersion'] ?>"><!-- wikibits js --></script>
     <!-- Head Scripts -->
-<?php $this->html('headscripts') ?>
+
+    <script src="<?php echo htmlspecialchars(ResourceLoader::makeLoaderURL(array("startup"), $this->data['lang'], $this->skin->skinname, null, null, false, "scripts")); ?>"></script>
+
 <?php if($this->data['jsvarurl']) { ?>
     <script type="<?php $this->text('jsmimetype') ?>" src="<?php $this->text('jsvarurl') ?>"><!-- site js --></script>
 <?php } ?>
@@ -116,11 +133,14 @@ class OSBridgeTemplate extends QuickTemplate {
     if($this->data['trackbackhtml']) print $this->data['trackbackhtml']; ?>
     <script src="<?php echo $this->text('stylepath'); ?>/osbridge/jquery.min.js" type="text/javascript" charset="utf-8"></script>
 
-    <style type="text/css" media="screen">
+    <script type="<?php $this->text('jsmimetype') ?>" src="<?php $this->text('stylepath' ) ?>/common/wikibits.js?<?php echo $GLOBALS['wgStyleVersion'] ?>"><!-- wikibits js --></script>
 
-    </style>
+    <style type="text/css" media="screen"></style>
+
+    <?php $this->html('headscripts') ?>
 
   </head>
+
 <body<?php if($this->data['body_ondblclick']) { ?> ondblclick="<?php $this->text('body_ondblclick') ?>"<?php } ?>
 <?php if($this->data['body_onload']) { ?> onload="<?php $this->text('body_onload') ?>"<?php } ?>
  class="mediawiki <?php $this->text('dir') ?> <?php $this->text('pageclass') ?> <?php $this->text('skinnameclass') ?>">
@@ -128,9 +148,8 @@ class OSBridgeTemplate extends QuickTemplate {
     <!-- #header_fragment BEGIN -->
     <?php require_once 'shared_fragments.php'; ?>
     <?php
-      global $OSBRIDGE_EVENT_SLUG;
-      if ($OSBRIDGE_EVENT_SLUG) {
-        require_shared_fragment("header_{$OSBRIDGE_EVENT_SLUG}");
+      if ($title_year) {
+        require_shared_fragment("header_{$title_year}");
       } else {
         require_shared_fragment('header_current');
       }
@@ -172,7 +191,7 @@ class OSBridgeTemplate extends QuickTemplate {
                    && in_array( $key, array( 'edit', 'watch', 'unwatch' ))) {
                 echo $skin->tooltip( "ca-$key" );
               } else {
-                echo $skin->tooltipAndAccesskey( "ca-$key" );
+                echo $skin->tooltipAndAccesskeyAttribs( "ca-$key" );
               }
               echo '>'.htmlspecialchars($tab['text']).'</a></li>';
             } ?>
@@ -180,7 +199,7 @@ class OSBridgeTemplate extends QuickTemplate {
         </div>
 
         <!-- page content -->
-        <h2 class="page_title"><?php $this->data['displaytitle']!=""?$this->html('title'):$this->text('title') ?></h2>
+        <h2 class="page_title"><?php echo htmlspecialchars($title_shortened); ?></h2>
         <div id="bodyContent">
           <h3 id="siteSub"><?php $this->msg('tagline') ?></h3>
           <div id="contentSub"><?php $this->html('subtitle') ?></div>
@@ -221,7 +240,7 @@ class OSBridgeTemplate extends QuickTemplate {
 <?php         foreach($this->data['personal_urls'] as $key => $item) { ?>
                 <li id="<?php echo Sanitizer::escapeId( "pt-$key" ) ?>"<?php
                 if ($item['active']) { ?> class="active"<?php } ?>><a href="<?php
-                echo htmlspecialchars($item['href']) ?>"<?php echo $skin->tooltipAndAccesskey('pt-'.$key) ?><?php
+                echo htmlspecialchars($item['href']) ?>"<?php echo $skin->tooltipAndAccesskeyAttribs('pt-'.$key) ?><?php
                 if(!empty($item['class'])) { ?> class="<?php
                 echo htmlspecialchars($item['class']) ?>"<?php } ?>><?php
                 echo htmlspecialchars($item['text']) ?></a></li>
@@ -258,7 +277,7 @@ class OSBridgeTemplate extends QuickTemplate {
                   && in_array( $key, array( 'edit', 'watch', 'unwatch' ))) {
                 echo $skin->tooltip( "ca-$key" );
               } else {
-                echo $skin->tooltipAndAccesskey( "ca-$key" );
+                echo $skin->tooltipAndAccesskeyAttribs( "ca-$key" );
               }
               echo '>'.htmlspecialchars($tab['text']).'</a></li>';
               } ?>
@@ -266,7 +285,7 @@ class OSBridgeTemplate extends QuickTemplate {
               <?php # OSBRIDGE: Add an upload link here rather than in the silly Toolbox ?>
               <?php $special = 'upload'; ?>
               <li id="t-<?php echo $special ?>"><a href="<?php echo htmlspecialchars($this->data['nav_urls'][$special]['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-'.$special) ?>><?php $this->msg($special) ?></a></li>
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-'.$special) ?>><?php $this->msg($special) ?></a></li>
               <?php $special = Nil; ?>
             </ul>
           </li>
@@ -348,17 +367,6 @@ class OSBridgeTemplate extends QuickTemplate {
   pageTracker._initData();
   pageTracker._trackPageview();
 </script>
-
-<script type="text/javascript">
-    // Defer loading "getclicky" till after the page has loaded, because it's external and slow.
-    $(document).ready(function () {
-        var element = document.createElement("script");
-        element.src = "http://static.getclicky.com/79611.js";
-        element.type = "text/javascript";
-        document.getElementsByTagName("head")[0].appendChild(element);
-    });
-</script>
-
 </body></html>
 <?php
   wfRestoreWarnings();
@@ -371,11 +379,11 @@ class OSBridgeTemplate extends QuickTemplate {
     <h3><label for="searchInput">Search Wiki</label></h3>
     <div id="searchBody" class="pBody">
       <form action="<?php $this->text('searchaction') ?>" id="searchform"><div>
-        <input id="searchInput" name="search" type="text"<?php echo $this->skin->tooltipAndAccesskey('search');
+        <input id="searchInput" name="search" type="text"<?php echo $this->skin->tooltipAndAccesskeyAttribs('search');
           if( isset( $this->data['search'] ) ) {
             ?> value="<?php $this->text('search') ?>"<?php } ?> />
-        <input type='submit' name="go" class="searchButton" id="searchGoButton" value="<?php $this->msg('searcharticle') ?>"<?php echo $this->skin->tooltipAndAccesskey( 'search-go' ); ?> />&nbsp;
-        <input type='submit' name="fulltext" class="searchButton" id="mw-searchButton" value="<?php $this->msg('searchbutton') ?>"<?php echo $this->skin->tooltipAndAccesskey( 'search-fulltext' ); ?> />
+        <input type='submit' name="go" class="searchButton" id="searchGoButton" value="<?php $this->msg('searcharticle') ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs( 'search-go' ); ?> />&nbsp;
+        <input type='submit' name="fulltext" class="searchButton" id="mw-searchButton" value="<?php $this->msg('searchbutton') ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs( 'search-fulltext' ); ?> />
       </div></form>
     </div>
   </li>
@@ -395,23 +403,23 @@ class OSBridgeTemplate extends QuickTemplate {
     if($this->data['notspecialpage']) { ?>
         <li id="t-whatlinkshere"><a href="<?php
         echo htmlspecialchars($this->data['nav_urls']['whatlinkshere']['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-whatlinkshere') ?>><?php $this->msg('whatlinkshere') ?></a></li>
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-whatlinkshere') ?>><?php $this->msg('whatlinkshere') ?></a></li>
 <?php
       if( $this->data['nav_urls']['recentchangeslinked'] ) { ?>
         <li id="t-recentchangeslinked"><a href="<?php
         echo htmlspecialchars($this->data['nav_urls']['recentchangeslinked']['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-recentchangeslinked') ?>><?php $this->msg('recentchangeslinked') ?></a></li>
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-recentchangeslinked') ?>><?php $this->msg('recentchangeslinked') ?></a></li>
 <?php     }
     }
     if(isset($this->data['nav_urls']['trackbacklink'])) { ?>
       <li id="t-trackbacklink"><a href="<?php
         echo htmlspecialchars($this->data['nav_urls']['trackbacklink']['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-trackbacklink') ?>><?php $this->msg('trackbacklink') ?></a></li>
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-trackbacklink') ?>><?php $this->msg('trackbacklink') ?></a></li>
 <?php   }
     if($this->data['feeds']) { ?>
       <li id="feedlinks"><?php foreach($this->data['feeds'] as $key => $feed) {
           ?><span id="<?php echo Sanitizer::escapeId( "feed-$key" ) ?>"><a href="<?php
-          echo htmlspecialchars($feed['href']) ?>"<?php echo $this->skin->tooltipAndAccesskey('feed-'.$key) ?>><?php echo htmlspecialchars($feed['text'])?></a>&nbsp;</span>
+          echo htmlspecialchars($feed['href']) ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('feed-'.$key) ?>><?php echo htmlspecialchars($feed['text'])?></a>&nbsp;</span>
           <?php } ?></li><?php
     }
 
@@ -419,20 +427,20 @@ class OSBridgeTemplate extends QuickTemplate {
 
       if($this->data['nav_urls'][$special]) {
         ?><li id="t-<?php echo $special ?>"><a href="<?php echo htmlspecialchars($this->data['nav_urls'][$special]['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-'.$special) ?>><?php $this->msg($special) ?></a></li>
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-'.$special) ?>><?php $this->msg($special) ?></a></li>
 <?php   }
     }
 
     # OSBRIDGE: Never show "Show printable version"
     if(false and !empty($this->data['nav_urls']['print']['href'])) { ?>
         <li id="t-print"><a href="<?php echo htmlspecialchars($this->data['nav_urls']['print']['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-print') ?>><?php $this->msg('printableversion') ?></a></li><?php
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-print') ?>><?php $this->msg('printableversion') ?></a></li><?php
     }
 
     # OSBRIDGE: Never show "Permanent link"
     if(false and !empty($this->data['nav_urls']['permalink']['href'])) { ?>
         <li id="t-permalink"><a href="<?php echo htmlspecialchars($this->data['nav_urls']['permalink']['href'])
-        ?>"<?php echo $this->skin->tooltipAndAccesskey('t-permalink') ?>><?php $this->msg('permalink') ?></a></li><?php
+        ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs('t-permalink') ?>><?php $this->msg('permalink') ?></a></li><?php
     } elseif (false and $this->data['nav_urls']['permalink']['href'] === '') { ?>
         <li id="t-ispermalink"<?php echo $this->skin->tooltip('t-ispermalink') ?>><?php $this->msg('permalink') ?></li><?php
     }
@@ -476,7 +484,7 @@ class OSBridgeTemplate extends QuickTemplate {
 <?php     foreach($cont as $key => $val) { ?>
         <li id="<?php echo Sanitizer::escapeId($val['id']) ?>"<?php
           if ( $val['active'] ) { ?> class="active" <?php }
-        ?>><a href="<?php echo htmlspecialchars($val['href']) ?>"<?php echo $this->skin->tooltipAndAccesskey($val['id']) ?>><?php echo htmlspecialchars($val['text']) ?></a></li>
+        ?>><a href="<?php echo htmlspecialchars($val['href']) ?>"<?php echo $this->skin->tooltipAndAccesskeyAttribs($val['id']) ?>><?php echo htmlspecialchars($val['text']) ?></a></li>
 <?php     } ?>
       </ul>
 <?php  } else {
